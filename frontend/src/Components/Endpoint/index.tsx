@@ -26,7 +26,15 @@ const Endpoint = (props: Props) => {
 
   const getData = async () => {
     setIsLoading(true);
-    const response = await fetch(`/api/${props.endpoint}`, { method: "GET" });
+    const apiHost = process.env.REACT_APP_API_HOST || "http://localhost:8000";
+    const isTransactionsSync =
+      props.endpoint === "transactions";
+    const url = isTransactionsSync
+      ? `${apiHost}/transactions/sync`
+      : `/api/${props.endpoint}`;
+    const response = await fetch(url, {
+      method: isTransactionsSync ? "POST" : "GET",
+    });
     const data = await response.json();
     if (data.error != null) {
       setError(data.error);

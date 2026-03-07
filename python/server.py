@@ -9,6 +9,7 @@ import uuid
 
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import plaid
 from plaid.model.payment_amount import PaymentAmount
 from plaid.model.payment_amount_currency import PaymentAmountCurrency
@@ -67,6 +68,7 @@ load_dotenv()
 
 
 app = Flask(__name__)
+CORS(app, origins=["*"], allow_headers=["*"], methods=["*"])
 
 PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
 PLAID_SECRET = os.getenv('PLAID_SECRET')
@@ -391,6 +393,38 @@ def get_auth():
 
 # Retrieve Transactions for an Item
 # https://plaid.com/docs/#transactions
+
+
+@app.route('/transactions/sync', methods=['POST'])
+def transactions_sync():
+    """Transactions sync endpoint - called directly by frontend with CORS."""
+    cursor = ''
+    added = []
+    modified = []
+    removed = []
+    has_more = True
+    try:
+        while has_more:
+            sync_request = TransactionsSyncRequest(
+                access_token=access_token,
+                cursor=cursor,
+            )
+            response = client.transactions_sync(sync_request).to_dict()
+            cursor = response['next_cursor']
+            if cursor == '':
+                time.sleep(2)
+                continue
+            added.extend(response['added'])
+            modified.extend(response['modified'])
+            removed.extend(response['removed'])
+            has_more = response['has_more']
+            pretty_print_response(response)
+
+        latest_transactions = sorted(added, key=lambda t: t['date'])[-8:]
+        return jsonify({'latest_transactions': latest_transactions})
+    except plaid.ApiException as e:
+        error_response = format_error(e)
+        return jsonify(error_response)
 
 
 @app.route('/api/transactions', methods=['GET'])
